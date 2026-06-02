@@ -2,12 +2,13 @@ import json, hashlib, base64, os, datetime, requests, sys
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
-# Configuration
+# --- Configuration ---
 LEDGER_FILE = "authority_strata.json"
 PRIVATE_KEY_FILE = "private_key.pem"
 DOCS_DIR = "to_sign"
 DID_URL = "https://stratigraphic-authority-ledger.vercel.app/.well-known/did.json"
 
+# --- Core Logic ---
 def get_public_key():
     response = requests.get(DID_URL)
     did_doc = response.json()
@@ -38,7 +39,8 @@ def anchor_ledger():
         with open(file_path, "rb") as f:
             content = f.read()
             doc_hash = hashlib.sha256(content).hexdigest()
-            if not any(entry['document_hash'] == doc_hash for entry in ledger):
+            # Only append if not already in ledger
+            if not any(entry.get('document_hash') == doc_hash for entry in ledger):
                 entry = {
                     "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                     "document_name": filename,
@@ -53,6 +55,7 @@ def verify_ledger():
     public_key = get_public_key()
     with open(LEDGER_FILE, "r") as f: ledger = json.load(f)
     for entry in ledger:
+        doc_name = entry.get("document_name", "Legacy/Unknown Entry")
         try:
             public_key.verify(
                 base64.b64decode(entry["signature"]),
@@ -60,9 +63,12 @@ def verify_ledger():
                 padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
                 hashes.SHA256()
             )
-            print(f"Verified: {entry['document_name']}")
-        except Exception: print(f"CRITICAL FAILURE: {entry['document_name']}")
+            print(f"Verified: {doc_name}")
+        except Exception as e: 
+            print(f"CRITICAL FAILURE: {doc_name} | Error: {e}")
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "verify": verify_ledger()
-    else: anchor_ledger()
+    if len(sys.argv) > 1 and sys.argv[1] == "verify": 
+        verify_ledger()
+    else: 
+        anchor_ledger()
