@@ -39,4 +39,24 @@ if __name__ == "__main__":
         print(f"Signature: {f_sig}")
     except FileNotFoundError:
         print(f"Error: Make sure {target_file} exists in the root folder.")
+import json
+import os
 
+def update_registry(file_hash, signature):
+    registry_path = "public/authority_strata.json"
+    
+    # Load existing data or start fresh if file doesn't exist
+    if os.path.exists(registry_path):
+        with open(registry_path, "r") as f:
+            data = json.load(f)
+    else:
+        data = {"records": []}
+    
+    # Add new record
+    new_record = {"hash": file_hash, "signature": signature}
+    data["records"].append(new_record)
+    
+    # Save back to file
+    with open(registry_path, "w") as f:
+        json.dump(data, f, indent=4)
+    print("Registry updated successfully.")

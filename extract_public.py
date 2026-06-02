@@ -15,3 +15,4 @@ with open("public_key.pem", "wb") as f:
     ))
 
 print("public_key.pem has been generated.")
+
