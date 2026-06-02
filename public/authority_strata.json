@@ -1,0 +1,36 @@
+{
+  "authority_ledger": [
+    {
+      "stratum_level": 1,
+      "authority_type": "Inherent / Pre-Federal / Ancestral",
+      "document_title": "Foundational Lineage Records & Inceptive Right",
+      "effective_date": "1776-07-04",
+      "jurisdiction_scope": "Inherent individual sovereignty that predates statutory creation.",
+      "legal_weight": "Absolute / Origin of moving power"
+    },
+    {
+      "stratum_level": 2,
+      "authority_type": "Constitutional / Organic Law",
+      "document_title": "Washington State Constitution",
+      "effective_date": "1889-11-11",
+      "jurisdiction_scope": "Establishes the three branches of state government, including the limits of the judiciary.",
+      "legal_weight": "Supreme state authority bounding all courts"
+    },
+    {
+      "stratum_level": 3,
+      "authority_type": "Statutory / Legislative Framework",
+      "document_title": "Revised Code of Washington (RCW) Title 2 - Courts of Record",
+      "effective_date": "1951-05-01",
+      "jurisdiction_scope": "Legislative organization of the Superior Court and delegation of record-keeping duties to the County Clerk.",
+      "legal_weight": "Mandated operational boundaries"
+    },
+    {
+      "stratum_level": 4,
+      "authority_type": "Administrative / Portal Regulations",
+      "document_title": "Washington State Local General Rule 31 (LGR 31)",
+      "effective_date": "2004-11-01",
+      "jurisdiction_scope": "Governs public access to digital court records via administrative portals.",
+      "legal_weight": "Strictly limited to data handling; cannot create new laws"
+    }
+  ]
+}
