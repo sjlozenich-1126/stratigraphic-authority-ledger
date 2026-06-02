@@ -1,16 +1,22 @@
-{{
+{
   "@context": "https://www.w3.org/ns/did/v1",
   "id": "did:web:sjlozenich-1126.github.io:stratigraphic-authority-ledger",
-  "verificationMethod": [{
-    "id": "did:web:sjlozenich-1126.github.io:stratigraphic-authority-ledger#owner",
-    "type": "JsonWebKey2020",
-    "controller": "did:web:sjlozenich-1126.github.io:stratigraphic-authority-ledger",
-    "publicKeyJwk": {
-      "kty": "RSA",
-      "n": "35X0y3Eve9gDyUWcooB0OfM4TNbfq-ZFGOLydV7o72bpOBSId8qba9OdgUuXwD42LOu9HKq1PPP5-DveBo4QDy0vHMMasb68juIxAGT3Xr7i-wM7CV0LTS6Pp5EtnZqc13ynSMHZu7QTFXJu4YQou6c0tfVK71GdvwI74VogWdu_InVl0DFenc6Uq8V9AB4x3-zU2WfANyKZ5TupYJZJmyeq4L-x9W_f55oal8VCj9EVOaFFJ2rNJ8_EGMeM_cmN3Whbf5uCEzUzVEy69he16Imt8UnQFv3qCJdriuA0UYRHf6XCcWkoli4pbQucC7W1pkU4DgV8lJDUrM60Gw327w",,
-      "e": "AQAB"
+  "verificationMethod": [
+    {
+      "id": "did:web:sjlozenich-1126.github.io:stratigraphic-authority-ledger#owner",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:sjlozenich-1126.github.io:stratigraphic-authority-ledger",
+      "publicKeyJwk": {
+        "kty": "RSA",
+        "n": "35X0y3Eve9gDyUWcooB0OfM4TNbfq-ZFGOLydV7o72bpOBSId8qba9OdgUuXwD42LOu9HKq1PPP5-DveBo4QDy0vHMMasb68juIxAGT3Xr7i-wM7CV0LTS6Pp5EtnZqc13ynSMHZu7QTFXJu4YQou6c0tfVK71GdvwI74VogWdu_InVl0DFenc6Uq8V9AB4x3-zU2WfANyKZ5TupYJZJmyeq4L-x9W_f55oal8VCj9EVOaFFJ2rNJ8_EGMeM_cmN3Whbf5uCEzUzVEy69he16Imt8UnQFv3qCJdriuA0UYRHf6XCcWkoli4pbQucC7W1pkU4DgV8lJDUrM60Gw327w",
+        "e": "AQAB"
+      }
     }
-  }],
-  "authentication": ["did:web:sjlozenich-1126.github.io:stratigraphic-authority-ledger#owner"],
-  "assertionMethod": ["did:web:sjlozenich-1126.github.io:stratigraphic-authority-ledger#owner"]
+  ],
+  "authentication": [
+    "did:web:sjlozenich-1126.github.io:stratigraphic-authority-ledger#owner"
+  ],
+  "assertionMethod": [
+    "did:web:sjlozenich-1126.github.io:stratigraphic-authority-ledger#owner"
+  ]
 }
