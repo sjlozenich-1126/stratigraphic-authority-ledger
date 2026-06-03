@@ -1,0 +1,26 @@
+{
+  "stratum_01": {
+    "level": "Inherent / Pre-Federal",
+    "effective_date": "1776-07-04",
+    "legal_weight": "Absolute / Origin of Moving Power",
+    "verification_type": "Chronological Priority (Phase A)"
+  },
+  "stratum_02": {
+    "level": "Constitutional / Organic Law",
+    "effective_date": "1889-11-11",
+    "legal_weight": "Supreme State Authority Bounding Courts",
+    "verification_type": "Credential Authentication (Phase B)"
+  },
+  "stratum_03": {
+    "level": "Statutory / Legislative Framework",
+    "effective_date": "1951-05-01",
+    "legal_weight": "Mandated Operational Boundaries",
+    "verification_type": "Statutory Alignment"
+  },
+  "stratum_04": {
+    "level": "Administrative / Portal Regulations",
+    "effective_date": "2004-11-01",
+    "legal_weight": "Strictly Limited Data Handling",
+    "verification_type": "System Integrity & Compliance (Phase C)"
+  }
+}
