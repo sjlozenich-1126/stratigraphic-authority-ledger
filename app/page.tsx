@@ -55,39 +55,32 @@ export default function Home() {
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   useEffect(() => {
-    fetch("/authority_strata.json")
-      .then((res) => {
-        if (!res.ok) throw new Error("Ledger resolution failed");
-        return res.json();
-      })
-      .then((data) => {
-        // Map ledger for the Data Source Matrix
-        const formattedLedger: Stratum[] = data.map((item: any, i: number) => ({
-          stratum_level: (i % 4) + 1,
-          authority_type: "Provenanced Anchor",
-          document_title: item.document_name,
-          effective_date: item.timestamp.split('T')[0],
-          jurisdiction_scope: "General Ledger Authority",
-          legal_weight: "Cryptographically Verified"
-        }));
-        setLedger(formattedLedger);
+    // Fetching both data sources to populate the dashboard
+    Promise.all([
+      fetch("/authority_strata.json").then((res) => res.json()),
+      fetch("/audit_ledger.json").then((res) => res.json())
+    ])
+      .then(([strataData, logData]) => {
+        // Set the hierarchical structure
+        setLedger(strataData.authority_ledger);
 
-        // Populate Audit Logs for Stratum 06
-        const logs: AuditLogEntry[] = data.map((item: any, i: number) => ({
+        // Map the audit ledger data to your AuditLogEntry interface
+        const formattedLogs: AuditLogEntry[] = logData.map((item: any, i: number) => ({
           timestamp: item.timestamp,
           action_id: `DOC-00${i + 1}`,
           action_name: item.document_name,
           status: "APPROVED",
-          stratum_target: 3,
+          stratum_target: (i % 4) + 1, // Maps logs to strata 1-4
           cryptographic_hash: `sha256_${item.document_hash.slice(0, 16)}`,
           governing_mandate: item.document_name
         }));
-        setAuditLogs(logs);
+
+        setAuditLogs(formattedLogs);
         setLoading(false);
       })
       .catch((err) => {
-        console.error(err);
-        setError("Unable to resolve authority_strata.json");
+        console.error("Data resolution error:", err);
+        setError("Unable to resolve system ledgers.");
         setLoading(false);
       });
   }, []);
