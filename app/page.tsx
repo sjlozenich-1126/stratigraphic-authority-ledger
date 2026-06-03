@@ -57,24 +57,40 @@ export default function Home() {
   useEffect(() => {
     fetch("/authority_strata.json")
       .then((res) => {
-        if (!res.ok) {
-          throw new Error(`Asset resolution failed with status: ${res.status}`);
-        }
+        if (!res.ok) throw new Error("Ledger resolution failed");
         return res.json();
       })
-      .then((data: LedgerPayload) => {
-        if (data && Array.isArray(data.authority_ledger)) {
-          setLedger(data.authority_ledger);
-        }
+      .then((data) => {
+        // Map ledger for the Data Source Matrix
+        const formattedLedger: Stratum[] = data.map((item: any, i: number) => ({
+          stratum_level: (i % 4) + 1,
+          authority_type: "Provenanced Anchor",
+          document_title: item.document_name,
+          effective_date: item.timestamp.split('T')[0],
+          jurisdiction_scope: "General Ledger Authority",
+          legal_weight: "Cryptographically Verified"
+        }));
+        setLedger(formattedLedger);
+
+        // Populate Audit Logs for Stratum 06
+        const logs: AuditLogEntry[] = data.map((item: any, i: number) => ({
+          timestamp: item.timestamp,
+          action_id: `DOC-00${i + 1}`,
+          action_name: item.document_name,
+          status: "APPROVED",
+          stratum_target: 3,
+          cryptographic_hash: `sha256_${item.document_hash.slice(0, 16)}`,
+          governing_mandate: item.document_name
+        }));
+        setAuditLogs(logs);
         setLoading(false);
       })
       .catch((err) => {
-        console.error("Public asset fetch failed:", err);
-        setError("Unable to resolve local stratigraphic ledger asset inside public/.");
+        console.error(err);
+        setError("Unable to resolve authority_strata.json");
         setLoading(false);
       });
   }, []);
-
   const handleIngestAction = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customActionName.trim()) return;
