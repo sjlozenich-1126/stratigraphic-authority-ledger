@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Provenance Ledger | Transparency Portal</title>
+    <style>
+        body { font-family: sans-serif; margin: 40px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f4f4f4; }
+    </style>
+</head>
+<body>
+    <h1>Provenance Ledger Audit Portal</h1>
+    <table id="ledgerTable">
+        <tr>
+            <th>Timestamp</th>
+            <th>Document Name</th>
+            <th>Hash (Fingerprint)</th>
+        </tr>
+    </table>
+
+    <script>
+        fetch('authority_strata.json')
+            .then(response => response.json())
+            .then(data => {
+                const table = document.getElementById('ledgerTable');
+                data.forEach(entry => {
+                    let row = `<tr>
+                        <td>${entry.timestamp}</td>
+                        <td>${entry.document_name}</td>
+                        <td><code>${entry.document_hash.substring(0, 16)}...</code></td>
+                    </tr>`;
+                    table.innerHTML += row;
+                });
+            });
+    </script>
+</body>
+</html>
