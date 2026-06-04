@@ -13,3 +13,24 @@ export async function GET() {
   }
 }
 
+export async function POST(request: Request) {
+  try {
+    const newEntry = await request.json();
+
+    const filePath = path.join(process.cwd(), "provenance_ledger.json");
+    const data = fs.readFileSync(filePath, "utf8");
+    const ledger = JSON.parse(data);
+
+    ledger.entries.push({
+      ...newEntry,
+      timestamp: new Date().toISOString()
+    });
+
+    fs.writeFileSync(filePath, JSON.stringify(ledger, null, 2));
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: "Could not write to ledger" }, { status: 500 });
+  }
+}
+
