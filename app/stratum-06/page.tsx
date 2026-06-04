@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface LedgerEntry {
   timestamp: string;
@@ -25,11 +25,16 @@ export default function Stratum06Viewer() {
         if (!response.ok) throw new Error('Failed to retrieve authority ledger records.');
         const data = await response.json();
         
-        // Sort entries so the newest commits appear at the top
-        const sortedData = data.sort((a: LedgerEntry, b: LedgerEntry) => 
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-        setLedger(sortedData);
+        // FIX: Ensure data exists and has elements before running the sort algorithm
+        if (Array.isArray(data) && data.length > 0) {
+          const sortedData = data.sort((a: LedgerEntry, b: LedgerEntry) => 
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          );
+          setLedger(sortedData);
+        } else {
+          // If the array is empty ([]), cleanly set it without sorting
+          setLedger([]);
+        }
       } catch (err: any) {
         setError(err.message || 'System connection failure.');
       } finally {
@@ -48,7 +53,7 @@ export default function Stratum06Viewer() {
           <div>
             <h1 className="text-4xl font-normal tracking-tight text-[#112F11]">STRATIGRAPHIC RECORD</h1>
             <p className="font-sans text-xs tracking-widest text-[#666] uppercase mt-2">
-              Stratum-06 System Ledger Ledger Viewer
+              Stratum-06 System Ledger Viewer
             </p>
           </div>
           <div className="text-right font-sans text-xs tracking-wider text-[#333]">
