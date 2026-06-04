@@ -1,26 +1,41 @@
 {
-  "stratum_01": {
-    "level": "Inherent / Pre-Federal",
-    "effective_date": "1776-07-04",
-    "legal_weight": "Absolute / Origin of Moving Power",
-    "verification_type": "Chronological Priority (Phase A)"
+  "system_metadata": {
+    "engine_version": "1.0.0",
+    "registry_authority": "Fiducia Centrale",
+    "last_updated": "2026-06-03"
   },
-  "stratum_02": {
-    "level": "Constitutional / Organic Law",
-    "effective_date": "1889-11-11",
-    "legal_weight": "Supreme State Authority Bounding Courts",
-    "verification_type": "Credential Authentication (Phase B)"
-  },
-  "stratum_03": {
-    "level": "Statutory / Legislative Framework",
-    "effective_date": "1951-05-01",
-    "legal_weight": "Mandated Operational Boundaries",
-    "verification_type": "Statutory Alignment"
-  },
-  "stratum_04": {
-    "level": "Administrative / Portal Regulations",
-    "effective_date": "2004-11-01",
-    "legal_weight": "Strictly Limited Data Handling",
-    "verification_type": "System Integrity & Compliance (Phase C)"
+  "strata": {
+    "STRATUM_01": {
+      "level_name": "Inherent / Pre-Federal / Ancestral",
+      "effective_date": "1776-07-04",
+      "jurisdictional_scope": "Inherent individual sovereignty that predates statutory creation.",
+      "legal_weight_baseline": "Absolute / Origin of moving power",
+      "validation_phase": "Phase A: Deep Historical Lineage",
+      "required_metadata": ["lineage_markers", "ancestral_anchor_date", "sovereign_declaration_ref"]
+    },
+    "STRATUM_02": {
+      "level_name": "Constitutional / Organic Law",
+      "effective_date": "1889-11-11",
+      "jurisdictional_scope": "Washington State Constitution - Establishes the three branches of state government, including judicial limits.",
+      "legal_weight_baseline": "Supreme state authority bounding all courts",
+      "validation_phase": "Phase B: Judicial Credential Authentication",
+      "required_metadata": ["constitutional_citation", "judicial_oath_verified", "venue_grounding"]
+    },
+    "STRATUM_03": {
+      "level_name": "Statutory / Legislative Framework",
+      "effective_date": "1951-05-01",
+      "jurisdictional_scope": "Revised Code of Washington (RCW) Title 2 - Courts of Record; Mandated Superior Court organization and Clerk duties.",
+      "legal_weight_baseline": "Mandated operational boundaries",
+      "validation_phase": "Phase C: System Integrity & Rule Compliance",
+      "required_metadata": ["rcw_statute_reference", "court_case_number", "filing_intent_id"]
+    },
+    "STRATUM_04": {
+      "level_name": "Administrative / Portal Regulations",
+      "effective_date": "2004-11-01",
+      "jurisdictional_scope": "Washington State Local General Rule 31 (LGR 31) - Governs public access to digital court records via portals.",
+      "legal_weight_baseline": "Strictly limited to data handling; cannot create new laws",
+      "validation_phase": "Phase C: System Integrity & Rule Compliance",
+      "required_metadata": ["administrative_rule", "portal_handling_type", "consent_status"]
+    }
   }
 }

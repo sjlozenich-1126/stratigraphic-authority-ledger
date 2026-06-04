@@ -1,62 +1,57 @@
-import hashlib
-import base64
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives import serialization
+from fastapi import FastAPI
+from pydantic import BaseModel
+from datetime import datetime
+import hashlib, json, pathlib, subprocess
 
-def sign_file(file_path, private_key_path):
-    # 1. Generate SHA-256 Hash
-    sha256_hash = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
-    file_hash = sha256_hash.digest()
-    
-    # 2. Load Private Key
-    with open(private_key_path, "rb") as key_file:
-        private_key = serialization.load_pem_private_key(
-            key_file.read(),
-            password=None
-        )
-    
-    # 3. Create Signature
-    signature = private_key.sign(
-        file_hash,
-        padding.PSS(
-            mgf=padding.MGF1(hashes.SHA256()),
-            salt_length=padding.PSS.MAX_LENGTH
-        ),
-        hashes.SHA256()
+LEDGER_PATH = pathlib.Path("provenance_ledger.json")
+
+app = FastAPI(title="Stratigraphic Legal Provenance Engine")
+
+class MintRequest(BaseModel):
+    document_name: str
+    raw_content: str
+    action_token: str
+    stratum: str
+    case_number: str | None = None
+    narrative_link: str | None = None
+
+def load_ledger():
+    if not LEDGER_PATH.exists():
+        return []
+    return json.loads(LEDGER_PATH.read_text())
+
+def save_ledger(entries):
+    LEDGER_PATH.write_text(json.dumps(entries, indent=2))
+
+@app.post("/mint")
+def mint_entry(req: MintRequest):
+    # 1. Hash the content
+    document_hash = hashlib.sha256(req.raw_content.encode("utf-8")).hexdigest()
+
+    # 2. Sign via your existing script
+    result = subprocess.run(
+        ["python", "scripts/sign_document.py", document_hash],
+        capture_output=True,
+        text=True,
+        check=True,
     )
-    
-    return file_hash.hex(), base64.b64encode(signature).decode('utf-8')
+    signature = result.stdout.strip()
 
-if __name__ == "__main__":
-    target_file = "test_doc.txt" # Change this to the file you want to sign
-    try:
-        f_hash, f_sig = sign_file(target_file, "private_key.pem")
-        print(f"File Hash: {f_hash}")
-        print(f"Signature: {f_sig}")
-    except FileNotFoundError:
-        print(f"Error: Make sure {target_file} exists in the root folder.")
-import json
-import os
-
-def update_registry(file_hash, signature):
-    registry_path = "public/authority_strata.json"
-    
-    # Load existing data or start fresh if file doesn't exist
-    if os.path.exists(registry_path):
-        with open(registry_path, "r") as f:
-            data = json.load(f)
-    else:
-        data = {"records": []}
-    
-    # Add new record
-    new_record = {"hash": file_hash, "signature": signature}
-    data["records"].append(new_record)
-    
-    # Save back to file
-    with open(registry_path, "w") as f:
-        json.dump(data, f, indent=4)
-    print("Registry updated successfully.")
+    # 3. Append to ledger
+    entries = load_ledger()
+    entry_id = f"SHANE-EVID-{datetime.utcnow().year}-{len(entries)+1:03d}"
+    entry = {
+        "id": entry_id,
+        "document_name": req.document_name,
+        "document_hash": document_hash,
+        "signature": signature,
+        "stratum": req.stratum,
+        "action_token": req.action_token,
+        "case_number": req.case_number,
+        "narrative_link": req.narrative_link,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "status": "minted",
+    }
+    entries.append(entry)
+    save_ledger(entries)
+    return entry
