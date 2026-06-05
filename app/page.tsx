@@ -1,489 +1,206 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
+import React, { useState, useEffect, useRef } from 'react';
 
-interface Stratum {
-  stratum_level: number;
-  authority_type: string;
-  document_title: string;
-  effective_date: string;
-  jurisdiction_scope: string;
-  legal_weight: string;
-}
+export default function IntegratedProvenanceLedger() {
+  const [ledgerEntries, setLedgerEntries] = useState<any[]>([]);
+  const stratum06ViewerRef = useRef<HTMLDivElement>(null);
 
-interface LedgerPayload {
-  authority_ledger: Stratum[];
-}
+  // Form State matching Stratum-07 input matrix fields exactly
+  const [formData, setFormData] = useState({
+    stratum_level: 'STRATUM 01',
+    stratum_title: 'INHERENT / ANCESTRAL AUTHORITY',
+    source_definition: 'Inherent / Ancestral Authority',
+    functional_jurisdiction: 'Central Trust Securities (Legal Frameworks)',
+    sovereign_issuer: 'Shane Jonathan Lozenich',
+    claim_payload: ''
+  });
 
-interface SystemAction {
-  id: string;
-  action_name: string;
-  target_stratum: number;
-  required_weight: string;
-  status: "pending" | "approved" | "denied";
-  justification?: string;
-}
+  // Automatically sync names and layers depending on the selected stratum dropdown option
+  const handleStratumChange = (level: string) => {
+    let title = '';
+    let source = '';
+    if (level === 'STRATUM 01') {
+      title = 'INHERENT / ANCESTRAL AUTHORITY';
+      source = 'Inherent / Ancestral Authority';
+    } else if (level === 'STRATUM 02') {
+      title = 'CONSTITUTIONAL / ORGANIC LAW';
+      source = 'Washington State Constitution';
+    }
+    setFormData({ ...formData, stratum_level: level, stratum_title: title, source_definition: source });
+  };
 
-interface AuditLogEntry {
-  timestamp: string;
-  action_id: string;
-  action_name: string;
-  status: "APPROVED" | "DENIED";
-  stratum_target: number;
-  cryptographic_hash: string;
-  governing_mandate?: string;
-}
-
-export default function Home() {
-  const [ledger, setLedger] = useState<Stratum[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Stratum 07 Ingestion Input State
-  const [customActionName, setCustomActionName] = useState("");
-  const [customTargetStratum, setCustomTargetStratum] = useState<number>(3);
-
-  // Procedural Actions Matrix State
-  const [actions, setActions] = useState<SystemAction[]>([
-    { id: "ACT-001", action_name: "Query Inceptive Ancestral Roots", target_stratum: 1, required_weight: "Absolute", status: "pending" },
-    { id: "ACT-002", action_name: "Modify Superior Court Record Structure", target_stratum: 3, required_weight: "Mandated", status: "pending" },
-    { id: "ACT-003", action_name: "Bypass LGR 31 Public Portal Restrictions", target_stratum: 4, required_weight: "Strictly Limited", status: "pending" },
-    { id: "ACT-004", action_name: "Execute Statutory Record Extraction (Supersede Portal)", target_stratum: 3, required_weight: "Mandated Operational Boundaries", status: "pending" },
-  ]);
-
-  // Operational Logging State (Stratum 06)
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  // Fetch streaming blocks from your API endpoint
+  const fetchLedger = async () => {
+    try {
+      const res = await fetch('/api/ledger');
+      const json = await res.json();
+      if (json.success) setLedgerEntries(json.data);
+    } catch (err) {
+      console.error('Pipeline streaming exception:', err);
+    }
+  };
 
   useEffect(() => {
-    // Fetching both data sources to populate the dashboard
-    Promise.all([
-      fetch("/authority_strata.json").then((res) => res.json()),
-      fetch("/audit_ledger.json").then((res) => res.json())
-    ])
-      .then(([strataData, logData]) => {
-        // Set the hierarchical structure
-        setLedger(strataData.authority_ledger);
-
-        // Map the audit ledger data to your AuditLogEntry interface
-        const formattedLogs: AuditLogEntry[] = logData.map((item: any, i: number) => ({
-          timestamp: item.timestamp,
-          action_id: `DOC-00${i + 1}`,
-          action_name: item.document_name,
-          status: "APPROVED",
-          stratum_target: (i % 4) + 1, // Maps logs to strata 1-4
-          cryptographic_hash: `sha256_${item.document_hash.slice(0, 16)}`,
-          governing_mandate: item.document_name
-        }));
-
-        setAuditLogs(formattedLogs);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Data resolution error:", err);
-        setError("Unable to resolve system ledgers.");
-        setLoading(false);
-      });
+    fetchLedger();
   }, []);
-  const handleIngestAction = (e: React.FormEvent) => {
+
+  const handleMintSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customActionName.trim()) return;
 
-    const nextId = `ACT-0${actions.length + 1}`;
-    const matchingStratum = ledger.find(s => s.stratum_level === customTargetStratum);
-    
-    const newAction: SystemAction = {
-      id: nextId,
-      action_name: customActionName,
-      target_stratum: customTargetStratum,
-      required_weight: matchingStratum?.legal_weight || "Standard Evaluation",
-      status: "pending"
-    };
+    try {
+      const response = await fetch('/api/ledger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
 
-    setActions(prev => [...prev, newAction]);
-    setCustomActionName("");
-  };
+      const result = await response.json();
 
-  const evaluateAction = (actionId: string, stratumLevel: number) => {
-    const matchingStratum = ledger.find(s => s.stratum_level === stratumLevel);
-    let finalStatus: "approved" | "denied" = "approved";
-    let finalJustification = "";
+      if (result.success) {
+        // 1. Instantly pull fresh data without reloading
+        await fetchLedger();
 
-    if (!matchingStratum) {
-      finalStatus = "denied";
-      finalJustification = "Target stratum layer does not exist in ledger authority.";
-    } else if (actionId === "ACT-003" || (stratumLevel === 4 && actions.find(a => a.id === actionId)?.action_name.toLowerCase().includes("bypass"))) {
-      finalStatus = "denied";
-      finalJustification = `Rejected by Stratum 04 Policy Rule: Administrative data portals cannot engineer overrides against superior statutory structures.`;
-    } else if (stratumLevel === 3) {
-      finalStatus = "approved";
-      finalJustification = `Elevated Route Cleared: Mandate anchored in Stratum 03 [${matchingStratum.document_title}]. Bypasses localized portal boundaries via absolute legislative delegation.`;
-    } else {
-      finalStatus = "approved";
-      finalJustification = `Verified against [${matchingStratum.document_title}]. Authority baseline match: ${matchingStratum.legal_weight}.`;
-    }
-
-    setActions(prev => prev.map(a => a.id === actionId ? { ...a, status: finalStatus, justification: finalJustification } : a));
-
-    const dynamicHash = btoa(actionId + stratumLevel + finalStatus + Date.now()).slice(0, 16).toLowerCase();
-    const newLog: AuditLogEntry = {
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      action_id: actionId,
-      action_name: actions.find(a => a.id === actionId)?.action_name || "Custom Ingestion",
-      status: finalStatus.toUpperCase() as "APPROVED" | "DENIED",
-      stratum_target: stratumLevel,
-      cryptographic_hash: `sha256_${dynamicHash}`,
-      governing_mandate: matchingStratum?.document_title || "Unknown Horizon"
-    };
-
-    setAuditLogs(prev => [newLog, ...prev]);
-  };
-
-  // STRATUM 09: PORTABLE DATA CREDENTIAL ISSUANCE TRACE (W3C DID:WEB COMPLIANT FOR GITHUB REGISTRY)
-  const downloadVerifiableCredential = (log: AuditLogEntry) => {
-    const vcPayload = {
-      "@context": [
-        "https://www.w3.org/2018/credentials/v1",
-        "https://schema.demopocrisy.com/contexts/authority-strata-v1.jsonld"
-      ],
-      id: `urn:uuid:${crypto.randomUUID()}`,
-      type: ["VerifiableCredential", "StratigraphicAuthorityCredential"],
-      issuer: "did:web:sjlozenich-1126.github.io:stratigraphic-authority-ledger",
-      issuanceDate: new Date().toISOString(),
-      credentialSubject: {
-        id: `did:user:local-agent`,
-        assertedAuthority: {
-          actionToken: log.action_id,
-          proceduralClaim: log.action_name,
-          targetStratumLevel: `Stratum-0${log.stratum_target}`,
-          provenanceValidationAnchor: log.governing_mandate,
-          verificationStatus: log.status
+        // 2. Direct viewport focus automatically down to the Stratum-06 block stream
+        if (stratum06ViewerRef.current) {
+          stratum06ViewerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-      },
-      proof: {
-        type: "Ed25519Signature2020",
-        created: new Date().toISOString(),
-        verificationMethod: "did:web:sjlozenich-1126.github.io:stratigraphic-authority-ledger#key-1",
-        proofPurpose: "assertionMethod",
-        jws: `eyJhbGciOiJFZERTQSIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..${log.cryptographic_hash}`
+
+        // Clear payload input for next transaction entry
+        setFormData(prev => ({ ...prev, claim_payload: '' }));
       }
-    };
-
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(vcPayload, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `authority_credential_${log.action_id}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+    } catch (error) {
+      console.error('Execution pipeline hold:', error);
+    }
   };
-
-  const getLayerStats = (level: number) => {
-    const layerLogs = auditLogs.filter(l => l.stratum_target === level);
-    const approved = layerLogs.filter(l => l.status === "APPROVED").length;
-    const denied = layerLogs.filter(l => l.status === "DENIED").length;
-    return { total: layerLogs.length, approved, denied };
-  };
-
-  const totalProcessed = auditLogs.length;
-  const approvedCount = auditLogs.filter(l => l.status === "APPROVED").length;
-  const deniedCount = auditLogs.filter(l => l.status === "DENIED").length;
-  const approvalRate = totalProcessed > 0 ? Math.round((approvedCount / totalProcessed) * 100) : 0;
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-8 font-sans">
-      <div className="max-w-5xl mx-auto space-y-12">
-        
-        {/* Header Block */}
-        <header className="border-b border-slate-800 pb-6">
-          <h1 className="text-3xl font-bold tracking-tight text-slate-200">
-            Stratigraphic Authority Ledger
-          </h1>
-          <p className="text-slate-400 mt-2 text-sm">
-            Procedural Inceptive Audit Framework • Decentralized Provenance Issuance
-          </p>
-        </header>
+    <div className="min-h-screen bg-[#f4f0e6] text-[#1c1c1c] p-8 font-serif selection:bg-[#0e2c1e]/10">
+      <div className="max-w-4xl mx-auto space-y-16">
 
-        {error && (
-          <div className="bg-red-950/40 border border-red-900 text-red-400 p-4 rounded-md text-sm">
-            {error}
-          </div>
-        )}
-
-        {/* STRATUM 08: RELATIONAL MAPPING & METRICS VISUALIZATION */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-slate-900/40 border border-slate-800 p-6 rounded-xl space-y-4">
+        {/* ==========================================
+            STRATUM-07: AUTHORITY MINTING INTERFACE
+           ========================================== */}
+        <section className="bg-white border border-[#e2dcce] shadow-sm p-10 max-w-3xl mx-auto">
+          <div className="flex justify-between items-baseline border-b border-[#1c1c1c] pb-4 mb-8">
             <div>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Stratum Level 08: Structural Flow Mapping</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Real-time load and exception constraints tracking across authority horizons.</p>
+              <h1 className="text-3xl font-serif tracking-wide text-[#0e2c1e]">PROVENANCE LEDGER</h1>
+              <p className="text-xs font-mono tracking-widest text-[#7c7565] uppercase mt-1">STRATUM-07 AUTHORITY MINTING INTERFACE</p>
             </div>
-
-            <div className="space-y-2 flex flex-col-reverse">
-              {[1, 2, 3, 4].map((level) => {
-                const stats = getLayerStats(level);
-                const match = ledger.find(s => s.stratum_level === level);
-                const thickness = stats.total > 0 ? Math.min(stats.total * 20 + 40, 120) : 40;
-                
-                return (
-                  <div 
-                    key={level}
-                    className="border border-slate-800 rounded-lg p-3 flex items-center justify-between transition-all relative overflow-hidden bg-slate-950/60"
-                    style={{ height: `${thickness}px` }}
-                  >
-                    <div className="absolute left-0 top-0 bottom-0 bg-cyan-950/20 pointer-events-none transition-all duration-500" style={{ width: `${stats.total * 15}%` }}></div>
-                    <div className="z-10 flex items-center gap-4">
-                      <span className="font-mono text-xs text-cyan-500 bg-slate-900 px-2 py-1 rounded border border-slate-800/80">
-                        L0{level}
-                      </span>
-                      <div>
-                        <span className="text-xs font-semibold text-slate-300 block leading-tight">
-                          {match ? match.authority_type : `Layer Horizon 0${level}`}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-500 block truncate max-w-md">
-                          {match ? match.document_title : "Unresolved Registry Path"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="z-10 font-mono text-[11px] flex gap-3 text-slate-400">
-                      <div>Blocks: <span className="text-slate-200 font-bold">{stats.total}</span></div>
-                      {stats.approved > 0 && <div className="text-emerald-500">A:{stats.approved}</div>}
-                      {stats.denied > 0 && <div className="text-rose-500">D:{stats.denied}</div>}
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="text-right font-mono text-xs uppercase tracking-wider text-[#1c1c1c]">
+              <div className="font-bold">Shane Jonathan Lozenich</div>
+              <div className="text-[#7c7565]">Jonathan Shane Concepts</div>
             </div>
           </div>
 
-          <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-xl flex flex-col justify-between gap-4">
-            <div className="space-y-4">
-              <div className="border-b border-slate-800/60 pb-2">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Pipeline Metrics</span>
+          <form onSubmit={handleMintSubmit} className="space-y-6 text-sm">
+            {/* Upper Input Layout Grid Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-[#fcfbfa] border border-[#e2dcce] p-3">
+                <label className="block text-[10px] font-mono tracking-widest text-[#7c7565] uppercase mb-1">Select Stratum Level</label>
+                <select 
+                  value={formData.stratum_level}
+                  onChange={(e) => handleStratumChange(e.target.value)}
+                  className="w-full bg-transparent font-serif text-sm border-b border-[#cbd5e1] py-1 focus:outline-none"
+                >
+                  <option value="STRATUM 01">Stratum 01 — Inherent / Ancestral Authority</option>
+                  <option value="STRATUM 02">Stratum 02 — Constitutional / Organic Law</option>
+                </select>
               </div>
-              <div className="flex justify-between items-baseline">
-                <span className="text-xs text-slate-400">Processed Block Stream:</span>
-                <span className="text-xl font-mono font-bold text-slate-200">{totalProcessed}</span>
+
+              <div className="bg-[#fcfbfa] border border-[#e2dcce] p-3">
+                <label className="block text-[10px] font-mono tracking-widest text-[#7c7565] uppercase mb-1">Primary Source Definition</label>
+                <input type="text" readOnly value={formData.source_definition} className="w-full bg-transparent font-serif text-sm text-[#5c5545] focus:outline-none" />
               </div>
-              <div className="flex justify-between items-baseline">
-                <span className="text-xs text-slate-400">Policy Confirmations:</span>
-                <span className="text-xl font-mono font-bold text-emerald-400">{approvedCount}</span>
+
+              <div className="bg-[#fcfbfa] border border-[#e2dcce] p-3">
+                <label className="block text-[10px] font-mono tracking-widest text-[#7c7565] uppercase mb-1">Functional Jurisdiction / Custodian</label>
+                <input type="text" readOnly value={formData.functional_jurisdiction} className="w-full bg-transparent font-serif text-sm text-[#5c5545] focus:outline-none" />
               </div>
-              <div className="flex justify-between items-baseline">
-                <span className="text-xs text-slate-400">Systemic Exception Holds:</span>
-                <span className="text-xl font-mono font-bold text-rose-400">{deniedCount}</span>
+
+              <div className="bg-[#fcfbfa] border border-[#e2dcce] p-3">
+                <label className="block text-[10px] font-mono tracking-widest text-[#7c7565] uppercase mb-1">Inherent Sovereign/Issuer</label>
+                <input type="text" readOnly value={formData.sovereign_issuer} className="w-full bg-transparent font-serif text-sm text-[#5c5545] focus:outline-none" />
               </div>
             </div>
-            <div className="border-t border-slate-800/60 pt-4 space-y-1">
-              <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider block">Rule Clearance Velocity</span>
-              <div className="text-3xl font-mono font-bold text-cyan-400">{approvalRate}%</div>
-            </div>
-          </div>
-        </section>
 
-        {/* STRATUM 07: USER INPUT INGESTION PORTAL */}
-        <section className="bg-slate-900/20 border border-slate-800/80 rounded-xl p-6 space-y-4">
-          <div>
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Stratum Level 07: User Input Ingestion Portal
-            </h2>
-            <p className="text-slate-500 text-sm mt-1">Submit new system queries or access requests directly into the stratigraphic evaluation engine.</p>
-          </div>
-
-          <form onSubmit={handleIngestAction} className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1 space-y-1 w-full">
-              <label className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Action Description / Query Parameters</label>
-              <input 
-                type="text" 
-                value={customActionName}
-                onChange={(e) => setCustomActionName(e.target.value)}
-                placeholder="e.g., Run procedural extraction trace or issue statutory challenge..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500 transition-colors"
+            {/* Substantive Text Input Block */}
+            <div>
+              <label className="block text-[11px] font-mono tracking-wider font-bold text-[#1c1c1c] uppercase mb-2">Substantive Claim / Statement of Fact</label>
+              <textarea
+                rows={6}
+                required
+                value={formData.claim_payload}
+                onChange={(e) => setFormData({ ...formData, claim_payload: e.target.value })}
+                placeholder="Enter the authoritative declaration, constitutional boundary, or trust framework declaration details..."
+                className="w-full bg-[#fcfbfa] border border-[#e2dcce] p-4 font-serif text-base leading-relaxed focus:outline-none focus:border-[#0e2c1e]"
               />
             </div>
-            <div className="w-full md:w-48 space-y-1">
-              <label className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Target Stratum</label>
-              <select 
-                value={customTargetStratum} 
-                onChange={(e) => setCustomTargetStratum(Number(e.target.value))}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-cyan-500 transition-colors"
-              >
-                <option value={1}>Stratum 01 (Inceptive Constitution)</option>
-                <option value={2}>Stratum 02 (Organic Enabling Acts)</option>
-                <option value={3}>Stratum 03 (Statutory RCW Codes)</option>
-                <option value={4}>Stratum 04 (Administrative Portals)</option>
-              </select>
-            </div>
+
             <button 
               type="submit"
-              className="w-full md:w-auto bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold px-5 py-2 rounded-lg text-sm transition-all"
+              className="w-full bg-[#0e2c1e] text-[#f4f0e6] font-mono text-xs uppercase tracking-widest py-3 hover:bg-[#153f2b] transition-all duration-200"
             >
-              Ingest Query
+              Commit Substantive Entry to Ledger Pipeline
             </button>
           </form>
         </section>
 
-        {/* STRATUM 05: PROCEDURAL POLICY MATRIX */}
-        <section className="space-y-4">
-          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Stratum Level 05: Procedural Policy Evaluation Engine
-          </h2>
-
-          <div className="bg-slate-900/30 border border-slate-800 rounded-xl p-6 space-y-4">
-            {actions.map((action) => (
-              <div 
-                key={action.id} 
-                className="flex flex-col md:flex-row md:items-center justify-between border border-slate-800/80 bg-slate-950/40 p-4 rounded-lg gap-4"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
-                      {action.id}
-                    </span>
-                    <span className="text-sm font-medium text-slate-200">
-                      {action.action_name}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    Evaluates targeting: <span className="text-cyan-500 font-mono">Stratum 0{action.target_stratum}</span> Matrix Base
-                  </p>
-                  {action.justification && (
-                    <p className={`text-xs mt-2 p-2 rounded border font-mono ${
-                      action.status === "approved" 
-                        ? "bg-emerald-950/20 border-emerald-950 text-emerald-400" 
-                        : "bg-rose-950/20 border-rose-950 text-rose-400"
-                    }`}>
-                      {action.justification}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  {action.status === "pending" ? (
-                    <button
-                      onClick={() => evaluateAction(action.id, action.target_stratum)}
-                      className="w-full md:w-auto text-xs px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-all border border-slate-700"
-                    >
-                      Audit Action
-                    </button>
-                  ) : (
-                    <span className={`text-xs font-mono uppercase tracking-wider px-3 py-1.5 rounded font-bold block text-center ${
-                      action.status === "approved"
-                        ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
-                        : "bg-rose-500/10 border border-rose-500/30 text-rose-400"
-                    }`}>
-                      {action.status}
-                    </span>
-                  )}
-                </div>
+        {/* ==========================================
+            STRATUM-06: TRANSACTION VIEW LOGS STREAM
+           ========================================== */}
+        <section ref={stratum06ViewerRef} className="pt-10 border-t border-[#cbd5e1] scroll-mt-8">
+          <div className="max-w-3xl mx-auto space-y-8">
+            <h2 className="text-xs font-mono tracking-widest text-[#7c7565] uppercase border-b border-[#cbd5e1] pb-2">STRATUM LEVEL 06: IMMUTABLE AUDIT RECORD</h2>
+            
+            {ledgerEntries.length === 0 ? (
+              <div className="text-center p-12 bg-white/60 border border-dashed border-[#e2dcce] text-sm italic text-[#7c7565]">
+                Awaiting programmatic validation cycles... Mint an active record block above to populate the ledger framework.
               </div>
-            ))}
-          </div>
-        </section>
-
-        {/* DATA SOURCE: READ-ONLY INGESTION CARDS */}
-        <section className="space-y-4">
-          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Data Source Reference Matrix (Strata 01 - 04)
-          </h2>
-          
-          {loading ? (
-            <div className="text-slate-500 animate-pulse text-sm">
-              Unpacking local stratigraphic layers...
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {ledger.map((stratum, index) => (
-                <div 
-                  key={`stratum-layer-${stratum.stratum_level}-${index}`} 
-                  className="bg-slate-900/50 border border-slate-800 rounded-lg p-6 hover:border-slate-700 transition-all"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <span className="text-xs font-mono text-cyan-500 uppercase tracking-widest block mb-1">
-                        Stratum Level 0{stratum.stratum_level} — {stratum.authority_type}
+            ) : (
+              ledgerEntries.map((entry) => (
+                <div key={entry.id} className="bg-white border border-[#e2dcce] shadow-sm p-8 space-y-6">
+                  {/* Ledger Block Entry Header */}
+                  <div className="flex justify-between items-center text-xs">
+                    <div className="flex items-center space-x-3">
+                      <span className="bg-[#0e2c1e] text-white font-mono text-[10px] tracking-widest font-bold px-2.5 py-1 uppercase">
+                        {entry.stratum_level}
                       </span>
-                      <h2 className="text-xl font-semibold text-slate-200">
-                        {stratum.document_title}
-                      </h2>
+                      <span className="font-mono tracking-wider text-[#7c7565] uppercase text-[11px]">
+                        {entry.stratum_title}
+                      </span>
                     </div>
-                    <span className="text-xs font-mono text-slate-500 bg-slate-950 px-2 py-1 rounded border border-slate-800">
-                      Eff: {stratum.effective_date}
-                    </span>
+                    <div className="font-mono text-[#7c7565] text-[11px]">
+                      {new Date(entry.timestamp).toLocaleString()}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-800/60 text-sm">
-                    <div className="md:col-span-2">
-                      <span className="text-xs font-semibold text-slate-500 uppercase block mb-1">Jurisdictional Scope</span>
-                      <p className="text-slate-300 leading-relaxed">{stratum.jurisdiction_scope}</p>
+
+                  {/* Primary Narrative Text Block */}
+                  <div className="space-y-4">
+                    <h4 className="text-[11px] font-mono tracking-wider text-[#7c7565] uppercase font-bold">Substantive Claim / Sovereign Record</h4>
+                    <p className="text-lg leading-relaxed text-[#1a1a1a] font-serif">
+                      {entry.claim_payload}
+                    </p>
+                  </div>
+
+                  {/* Ledger Anchor Baseline Grid Info */}
+                  <div className="grid grid-cols-2 gap-4 border-t border-[#f2efe4] pt-4 text-[11px] font-mono">
+                    <div>
+                      <span className="text-[#7c7565] block uppercase text-[9px] tracking-tight">Jurisdictional Anchor</span>
+                      <span className="text-[#1c1c1c]">{entry.functional_jurisdiction}</span>
                     </div>
                     <div>
-                      <span className="text-xs font-semibold text-slate-500 uppercase block mb-1">Legal Weight Baseline</span>
-                      <p className="text-slate-300 font-medium text-amber-500/90">{stratum.legal_weight}</p>
+                      <span className="text-[#7c7565] block uppercase text-[9px] tracking-tight">Inherent Sovereign Issuer</span>
+                      <span className="text-[#1c1c1c]">{entry.sovereign_issuer}</span>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* STRATUM 06: IMMUTABLE AUDIT LOGS WITH PORTABLE VERIFIABLE CREDENTIAL EXPORT */}
-        <section className="space-y-4">
-          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Stratum Level 06: Immutable Transaction Logs & Credential Minting
-          </h2>
-          <div className="bg-slate-950 border border-slate-900 rounded-xl overflow-hidden">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-800 bg-slate-900/40 text-xs font-semibold text-slate-400 tracking-wider font-mono">
-                  <th className="p-4">Timestamp</th>
-                  <th className="p-4">Action Token</th>
-                  <th className="p-4">Target Strata</th>
-                  <th className="p-4">Status Baseline</th>
-                  <th className="p-4">Portable Authority Payload</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-900/60 font-mono text-xs">
-                {auditLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-slate-600 italic">
-                      Awaiting procedural audit executions to stream data metrics...
-                    </td>
-                  </tr>
-                ) : (
-                  auditLogs.map((log, index) => (
-                    <tr key={index} className="hover:bg-slate-900/20 transition-colors">
-                      <td className="p-4 text-slate-400">{log.timestamp}</td>
-                      <td className="p-4 font-semibold text-slate-200">{log.action_id}</td>
-                      <td className="p-4 text-cyan-500">Stratum 0{log.stratum_target}</td>
-                      <td className="p-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wide ${
-                          log.status === "APPROVED" 
-                            ? "bg-emerald-950 text-emerald-400 border border-emerald-900/50" 
-                            : "bg-rose-950 text-rose-400 border border-rose-900/50"
-                        }`}>
-                          {log.status}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        {log.status === "APPROVED" ? (
-                          <button
-                            onClick={() => downloadVerifiableCredential(log)}
-                            className="bg-cyan-950 hover:bg-cyan-900 text-cyan-400 border border-cyan-800/60 px-3 py-1 rounded text-[11px] font-semibold transition-colors uppercase tracking-wider"
-                          >
-                            Export VC Block
-                          </button>
-                        ) : (
-                          <span className="text-slate-600 italic text-[11px]">Halting State Intercepted</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+              ))
+            )}
           </div>
         </section>
 
       </div>
-    </main>
+    </div>
   );
 }
