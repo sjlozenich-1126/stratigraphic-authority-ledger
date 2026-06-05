@@ -1,3 +1,30 @@
+// Place these robust definitions at the top of your unified page file
+const strataData = {
+  "stratum-01": {
+    title: "STRATUM 01 — INHERENT / ANCESTRAL AUTHORITY",
+    scope: "Inherent individual sovereignty that predates statutory creation.",
+    weight: "Absolute / Origin of moving power",
+    effectiveDate: "1776-07-04"
+  },
+  "stratum-02": {
+    title: "STRATUM 02 — CONSTITUTIONAL / ORGANIC LAW",
+    scope: "Establishes the three branches of state government, including the limits of the judiciary.",
+    weight: "Supreme state authority bounding all courts",
+    effectiveDate: "1889-11-11"
+  },
+  "stratum-03": {
+    title: "STRATUM 03 — STATUTORY / LEGISLATIVE FRAMEWORK",
+    scope: "Legislative organization of the Superior Court and delegation of record-keeping duties to the County Clerk.",
+    weight: "Mandated operational boundaries",
+    effectiveDate: "1951-05-01"
+  },
+  "stratum-04": {
+    title: "STRATUM 04 — ADMINISTRATIVE / PORTAL REGULATIONS",
+    scope: "Governs public access to digital court records via administrative portals.",
+    weight: "Strictly limited to data handling; cannot create new laws",
+    effectiveDate: "2004-11-01"
+  }
+};
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
