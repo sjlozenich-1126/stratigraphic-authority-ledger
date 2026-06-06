@@ -19,6 +19,9 @@ interface LedgerEntry {
   timestamp: string;
   token: string;
   target: string;
+  claim: string;
+  precedingBlockHash: string;
+  currentBlockHash: string;
   status: string;
 }
 
@@ -65,16 +68,18 @@ const PROCEDURAL_ACTIONS = [
 
 export default function ProvenanceDashboard() {
   const [pipelineMetrics, setPipelineMetrics] = useState<PipelineMetrics>({
-    processedBlocks: 5,
-    policyConfirmations: 5,
+    processedBlocks: 0,
+    policyConfirmations: 0,
     exceptionHolds: 0,
     clearanceVelocity: 100
   });
 
   const [ledgerLogs, setLedgerLogs] = useState<LedgerEntry[]>([]);
   const [inputQuery, setInputQuery] = useState('');
+  const [sysToken, setSysToken] = useState('');
   const [selectedStratum, setSelectedStratum] = useState('stratum-01');
   const [isLoading, setIsLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error' | null, text: string }>({ type: null, text: '' });
 
   // 1. GET Request Lifecycle Hook: Sync backend ledger logs with UI state
   const refreshLedgerState = async () => {
@@ -83,9 +88,7 @@ export default function ProvenanceDashboard() {
       const data = await response.json();
       
       if (Array.isArray(data)) {
-        // Map backend's data format seamlessly back to your original view structure
         const UIFormattedLogs: LedgerEntry[] = data.map((item: any, index: number) => {
-          // Parse out stratum identifiers safely ("01" -> "Stratum 01")
           const cleanTarget = item.stratum.toLowerCase().includes('stratum') 
             ? item.stratum.replace(/\b\w/g, (c: string) => c.toUpperCase())
             : `Stratum ${item.stratum}`;
@@ -93,20 +96,26 @@ export default function ProvenanceDashboard() {
           return {
             id: item.id || `log-${index}`,
             timestamp: item.timestamp,
-            token: item.token || `DOC-00${index + 1}`,
+            token: item.token || `CTS-BLK-${1000 + index}`,
             target: cleanTarget,
-            status: "APPROVED"
+            claim: item.claim || '',
+            precedingBlockHash: item.precedingBlockHash || '',
+            currentBlockHash: item.currentBlockHash || '',
+            status: item.status || "APPROVED"
           };
         });
 
-        // Display newest entries on top matching screen captures
         setLedgerLogs([...UIFormattedLogs].reverse());
         
         setPipelineMetrics(prev => ({
           ...prev,
           processedBlocks: data.length,
-          policyConfirmations: data.length
+          policyConfirmations: data.length,
+          exceptionHolds: 0
         }));
+      } else if (data.error) {
+        console.error("Backend response error status:", data.error);
+        setPipelineMetrics(prev => ({ ...prev, exceptionHolds: 1 }));
       }
     } catch (err) {
       console.error("Failed to sync structural log parameters with API endpoint:", err);
@@ -123,8 +132,8 @@ export default function ProvenanceDashboard() {
     if (!inputQuery.trim() || isLoading) return;
 
     setIsLoading(true);
+    setStatusMessage({ type: null, text: '' });
 
-    // Extract raw string digits ("stratum-01" -> "01") to meet backend specification criteria
     const backendStratumCode = selectedStratum.replace('stratum-', '');
 
     const targetPayload = {
@@ -132,15 +141,16 @@ export default function ProvenanceDashboard() {
       claim: inputQuery,
       source: STRATA_REGISTRY[selectedStratum].title,
       owner: "Shane Jonathan Lozenich",
-      concept: "Jonathan Shane Concepts",
-      framework: STRATA_REGISTRY[selectedStratum].weight,
-      evidence: ["Digital Cryptographic Handshake Authorization"]
+      framework: STRATA_REGISTRY[selectedStratum].weight
     };
 
     try {
       const response = await fetch('/api/ledger', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Fiducia-Token': sysToken // Secure handshake signature header
+        },
         body: JSON.stringify(targetPayload)
       });
 
@@ -148,11 +158,14 @@ export default function ProvenanceDashboard() {
 
       if (result.success) {
         setInputQuery('');
-        // Re-sync components to include newly generated mint block
+        setStatusMessage({ type: 'success', text: `Successfully verified and minted block token: ${result.blockToken}` });
         await refreshLedgerState();
+      } else {
+        setStatusMessage({ type: 'error', text: result.error || 'Authorization failed.' });
+        setPipelineMetrics(prev => ({ ...prev, exceptionHolds: prev.exceptionHolds + 1 }));
       }
-    } catch (err) {
-      console.error("Ingestion transmission interface error:", err);
+    } catch (err: any) {
+      setStatusMessage({ type: 'error', text: `Transmission interface error: ${err.message}` });
     } finally {
       setIsLoading(false);
     }
@@ -183,7 +196,7 @@ export default function ProvenanceDashboard() {
           {/* Data Ingestion Influx Point */}
           <section className="bg-[#FAF8F5] border border-[#D1C9B7] p-6 shadow-sm">
             <h2 className="text-xs font-sans uppercase font-bold tracking-widest mb-6 pb-2 border-b border-[#E6E1D3]">
-              STRATUM-07 AUTHORITY MINTING INTERFACE
+              STRATUM AUTHORITY MINTING INTERFACE
             </h2>
             
             <form onSubmit={handleIngestQuery} className="space-y-6">
@@ -207,11 +220,15 @@ export default function ProvenanceDashboard() {
 
                 <div>
                   <label className="block text-[10px] font-bold tracking-wider uppercase mb-1 text-[#5C6E63]">
-                    Functional Jurisdiction / Custodian
+                    X-Fiducia Handshake Token
                   </label>
-                  <div className="bg-[#EAE5D8] border border-[#C2BAA8] text-xs p-2.5 text-[#4A534D]">
-                    Central Trust Securities (Legal Frameworks)
-                  </div>
+                  <input
+                    type="password"
+                    value={sysToken}
+                    onChange={(e) => setSysToken(e.target.value)}
+                    placeholder="Enter system deployment secret passphrase..."
+                    className="w-full bg-[#F4F1EA] border border-[#C2BAA8] text-xs p-2.5 outline-none focus:border-[#1C2D24] font-mono"
+                  />
                 </div>
               </div>
 
@@ -236,6 +253,14 @@ export default function ProvenanceDashboard() {
                 />
               </div>
 
+              {statusMessage.text && (
+                <div className={`p-3 font-sans text-xs border ${
+                  statusMessage.type === 'success' ? 'bg-[#E1EFE6] border-[#B2D8C0] text-[#1C643A]' : 'bg-red-50 border-red-200 text-red-800'
+                }`}>
+                  {statusMessage.text}
+                </div>
+              )}
+
               <div className="flex justify-end">
                 <button 
                   type="submit"
@@ -251,48 +276,48 @@ export default function ProvenanceDashboard() {
           {/* Immutable Cryptographic Table Logging */}
           <section className="bg-[#FAF8F5] border border-[#D1C9B7] p-6 shadow-sm">
             <h2 className="text-xs font-sans uppercase font-bold tracking-widest mb-4 pb-2 border-b border-[#E6E1D3]">
-              STRATUM LEVEL 06: IMMUTABLE TRANSACTION LOGS & CREDENTIAL MINTING
+              IMMUTABLE LEGISLATIVE BLOCKS & VERIFIABLE TRANSACTIONS
             </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse font-sans text-xs">
-                <thead>
-                  <tr className="border-b-2 border-[#1C2D24] text-[#5C6E63] uppercase tracking-wider text-[10px]">
-                    <th className="py-2">Timestamp</th>
-                    <th className="py-2">Action Token</th>
-                    <th className="py-2">Target Strata</th>
-                    <th className="py-2 text-right">Status Baseline</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#E6E1D3]">
-                  {ledgerLogs.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="py-4 text-center text-xs italic text-[#5C6E63]">
-                        Synchronizing tracking data indexes...
-                      </td>
-                    </tr>
-                  ) : (
-                    ledgerLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-[#F4F1EA]/50 font-mono text-[11px]">
-                        <td className="py-3 text-[#5C6E63]">{log.timestamp}</td>
-                        <td className="py-3 font-bold text-[#1C2D24]">{log.token}</td>
-                        <td className="py-3 font-sans text-[#1C2D24]">{log.target}</td>
-                        <td className="py-3 text-right font-sans">
-                          <span className="inline-block bg-[#E1EFE6] text-[#1C643A] font-bold px-2 py-0.5 rounded text-[10px] tracking-wide">
-                            {log.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div className="space-y-6">
+              {ledgerLogs.length === 0 ? (
+                <div className="py-4 text-center text-xs italic text-[#5C6E63] font-sans">
+                  Synchronizing tracking data indexes from Upstash database stream...
+                </div>
+              ) : (
+                ledgerLogs.map((log) => (
+                  <div key={log.id} className="border border-[#E6E1D3] bg-[#FAF8F5] p-4 text-xs space-y-3 font-sans">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-[#E6E1D3] pb-2 gap-2">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono font-bold text-sm text-[#1C2D24]">{log.token}</span>
+                        <span className="bg-[#EAE5D8] px-2 py-0.5 font-bold uppercase tracking-wider text-[9px] text-[#4A5D53]">
+                          {log.target}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 font-mono text-[10px] text-[#5C6E63]">
+                        <span>{new Date(log.timestamp).toLocaleString()}</span>
+                        <span className="bg-[#E1EFE6] text-[#1C643A] font-bold px-1.5 py-0.5 rounded text-[9px]">
+                          {log.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="font-serif text-sm text-[#1C2D24] italic bg-white p-3 border border-[#F0EFEA] leading-relaxed whitespace-pre-wrap">
+                      "{log.claim}"
+                    </div>
+
+                    <div className="space-y-1 font-mono text-[9px] text-[#6B7C70] bg-[#F4F1EA]/60 p-2 border border-[#E6E1D3]">
+                      <div className="truncate"><span className="font-bold uppercase text-[#4A5D53]">Block Hash:</span> {log.currentBlockHash}</div>
+                      <div className="truncate"><span className="font-bold uppercase text-[#4A5D53]">Parent Hash:</span> {log.precedingBlockHash}</div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </section>
         </div>
 
         {/* Real-time Telemetry Pipeline Display Panel (Right Sidebar) */}
         <div className="space-y-6">
-          
           <section className="border-2 border-[#1C2D24] bg-[#FAF8F5] p-5">
             <h3 className="text-xs font-sans font-bold tracking-widest uppercase mb-4 border-b border-[#1C2D24] pb-2">
               Pipeline Metrics Engine
