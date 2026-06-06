@@ -1,18 +1,19 @@
-
-
 import { NextResponse } from 'next/server';
+import { Redis } from '@upstash/redis';
 import crypto from 'crypto';
 
-// Strict CORS and Security Policy Headers Configuration
+// Strict CORS Policy Headers Configuration
 const SECURITY_HEADERS = {
-  'Access-Control-Allow-Origin': '*', // Point directly to your custom domain in production for rigid security
+  'Access-Control-Allow-Origin': '*', // Points directly to your custom domain in production
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, X-Fiducia-Token',
 };
 
-// Simplified mock database connection to represent an append-only transaction ledger matrix
-// Replace this array with your active Supabase/Dolt connection string logic in full production
-let immutableLedgerJournal: any[] = [];
+// Initialize Upstash Redis directly from your pulled Vercel Environment Variables
+const redis = Redis.fromEnv();
+
+// Database Key Namespace identifier for your immutable ledger chain stream
+const DB_LEDGER_KEY = 'fiducia_central_ledger_stream';
 
 /**
  * 1. OPTIONS Preflight Pre-Verification Handler
@@ -22,14 +23,25 @@ export async function OPTIONS() {
 }
 
 /**
- * 2. GET Handler: Reads the complete verifiable block sequence
+ * 2. GET Handler: Reads the complete verifiable block sequence from Cloud Database
  */
 export async function GET() {
-  return NextResponse.json(immutableLedgerJournal, { headers: SECURITY_HEADERS });
+  try {
+    // Retrieve the complete array transaction log sequence from Upstash Redis storage
+    const storedLedger = await redis.get<any[]>(DB_LEDGER_KEY);
+    const databaseJournal = storedLedger || [];
+    
+    return NextResponse.json(databaseJournal, { headers: SECURITY_HEADERS });
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, error: `Database Read Error: ${error.message}` },
+      { status: 500, headers: SECURITY_HEADERS }
+    );
+  }
 }
 
 /**
- * 3. POST Handler: Validates, signs, hashes, and registers the authoritative claim
+ * 3. POST Handler: Validates, signs, hashes, and registers claims to Cloud Database
  */
 export async function POST(request: Request) {
   try {
@@ -44,7 +56,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // B. Security Verification: Extract incoming Request Header Token
+    // B. Security Verification: Validate incoming Request Header Token
     const authHeaderToken = request.headers.get('X-Fiducia-Token');
     const systemSecretSignature = process.env.FIDUCIA_SYS_TOKEN || "DEFAULT_SYS_PASS_770";
 
@@ -55,14 +67,17 @@ export async function POST(request: Request) {
       );
     }
 
+    // Pull current transaction journal from Upstash Redis database to compute chaining links
+    const storedLedger = await redis.get<any[]>(DB_LEDGER_KEY);
+    const databaseJournal = storedLedger || [];
+
     // C. Mathematical Immutability Chaining Model
-    // Locate the cryptographic string hash from the block directly before this one
-    const precedingBlockHash = immutableLedgerJournal.length > 0 
-      ? immutableLedgerJournal[immutableLedgerJournal.length - 1].currentBlockHash 
+    const precedingBlockHash = databaseJournal.length > 0 
+      ? databaseJournal[databaseJournal.length - 1].currentBlockHash 
       : "0000000000000000000000000000000000000000000000000000000000000000";
 
     const timestampIso = new Date().toISOString();
-    const systemicActionToken = `CTS-BLK-${1000 + immutableLedgerJournal.length}`;
+    const systemicActionToken = `CTS-BLK-${1000 + databaseJournal.length}`;
 
     // Compile entire localized entry array state down into a flat serialization string
     const stringDataToHash = `${timestampIso}-${systemicActionToken}-${stratum}-${claim}-${precedingBlockHash}`;
@@ -87,8 +102,11 @@ export async function POST(request: Request) {
       status: "APPROVED"
     };
 
-    // Commit to persistent data ledger journal array matrix
-    immutableLedgerJournal.push(auditedBlockRecord);
+    // Append the newly minted block record to the existing cloud ledger array
+    databaseJournal.push(auditedBlockRecord);
+
+    // Commit the updated array back to permanent Upstash Redis Cloud storage
+    await redis.set(DB_LEDGER_KEY, databaseJournal);
 
     return NextResponse.json(
       { success: true, blockToken: systemicActionToken, hash: currentBlockHash },
