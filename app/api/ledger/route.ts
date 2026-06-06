@@ -9,10 +9,10 @@ const SECURITY_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, X-Fiducia-Token',
 };
 
-// Explicitly initialize Upstash Redis using your pulled Vercel Environment Variables
+// Explicitly initialize Upstash Redis using the exact prefixed keys from your Vercel Environment Variables
 const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+  url: process.env.fiducia_central_ledger_stream_KV_URL || process.env.fiducia_central_ledger_stream_REDIS_URL!,
+  token: process.env.fiducia_central_ledger_stream_REST_API_TOKEN!,
 });
 
 // Database Key Namespace identifier for your immutable ledger chain stream
