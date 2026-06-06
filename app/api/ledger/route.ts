@@ -4,29 +4,37 @@ import crypto from 'crypto';
 
 // Strict CORS Policy Headers Configuration
 const SECURITY_HEADERS = {
-  'Access-Control-Allow-Origin': '*', // Allows your frontend interface to connect securely
+  'Access-Control-Allow-Origin': '*', 
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, X-Fiducia-Token',
 };
 
-// Safely resolve the environment variables to satisfy the TypeScript compiler
-const redisUrl = 
-  process.env.fiducia_central_ledger_stream_KV_URL || 
-  process.env.fiducia_central_ledger_stream_REDIS_URL || 
-  process.env.UPSTASH_REDIS_REST_URL;
-
-const redisToken = 
-  process.env.fiducia_central_ledger_stream_REST_API_TOKEN || 
-  process.env.UPSTASH_REDIS_REST_TOKEN;
-
-// Initialize Upstash Redis client with resolved credentials
-const redis = new Redis({
-  url: redisUrl!,
-  token: redisToken!,
-});
-
 // Database Key Namespace identifier for your immutable ledger chain stream
 const DB_LEDGER_KEY = 'fiducia_central_ledger_stream';
+
+/**
+ * Helper function to safely initialize Redis only on demand.
+ * This completely prevents the Next.js static build pre-evaluation crash.
+ */
+function getRedisClient() {
+  const redisUrl = 
+    process.env.fiducia_central_ledger_stream_KV_URL || 
+    process.env.fiducia_central_ledger_stream_REDIS_URL || 
+    process.env.UPSTASH_REDIS_REST_URL;
+
+  const redisToken = 
+    process.env.fiducia_central_ledger_stream_REST_API_TOKEN || 
+    process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  if (!redisUrl || !redisToken) {
+    throw new Error("Missing database credentials in the current execution environment.");
+  }
+
+  return new Redis({
+    url: redisUrl,
+    token: redisToken,
+  });
+}
 
 /**
  * 1. OPTIONS Preflight Pre-Verification Handler
@@ -40,6 +48,8 @@ export async function OPTIONS() {
  */
 export async function GET() {
   try {
+    const redis = getRedisClient();
+    
     // Retrieve the complete array transaction log sequence from Upstash Redis storage
     const storedLedger = await redis.get<any[]>(DB_LEDGER_KEY);
     const databaseJournal = storedLedger || [];
@@ -79,6 +89,8 @@ export async function POST(request: Request) {
         { status: 401, headers: SECURITY_HEADERS }
       );
     }
+
+    const redis = getRedisClient();
 
     // Pull current transaction journal from Upstash Redis database to compute chaining links
     const storedLedger = await redis.get<any[]>(DB_LEDGER_KEY);
