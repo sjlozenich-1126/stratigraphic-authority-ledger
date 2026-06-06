@@ -17,17 +17,12 @@ const DB_LEDGER_KEY = 'fiducia_central_ledger_stream';
  * This completely prevents the Next.js static build pre-evaluation crash.
  */
 function getRedisClient() {
-  const redisUrl = 
-    process.env.fiducia_central_ledger_stream_KV_URL || 
-    process.env.fiducia_central_ledger_stream_REDIS_URL || 
-    process.env.UPSTASH_REDIS_REST_URL;
-
-  const redisToken = 
-    process.env.fiducia_central_ledger_stream_REST_API_TOKEN || 
-    process.env.UPSTASH_REDIS_REST_TOKEN;
+  // Force the application to look ONLY for the clean, standard REST variables
+  const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
   if (!redisUrl || !redisToken) {
-    throw new Error("Missing database credentials in the current execution environment.");
+    throw new Error("Missing explicit standard database credentials in the current execution environment.");
   }
 
   return new Redis({
