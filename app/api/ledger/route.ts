@@ -4,15 +4,25 @@ import crypto from 'crypto';
 
 // Strict CORS Policy Headers Configuration
 const SECURITY_HEADERS = {
-  'Access-Control-Allow-Origin': '*', // Allows your Google Site frontend to connect securely
+  'Access-Control-Allow-Origin': '*', // Allows your frontend interface to connect securely
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, X-Fiducia-Token',
 };
 
-// Explicitly initialize Upstash Redis using the exact prefixed keys from your Vercel Environment Variables
+// Safely resolve the environment variables to satisfy the TypeScript compiler
+const redisUrl = 
+  process.env.fiducia_central_ledger_stream_KV_URL || 
+  process.env.fiducia_central_ledger_stream_REDIS_URL || 
+  process.env.UPSTASH_REDIS_REST_URL;
+
+const redisToken = 
+  process.env.fiducia_central_ledger_stream_REST_API_TOKEN || 
+  process.env.UPSTASH_REDIS_REST_TOKEN;
+
+// Initialize Upstash Redis client with resolved credentials
 const redis = new Redis({
-  url: process.env.fiducia_central_ledger_stream_KV_URL || process.env.fiducia_central_ledger_stream_REDIS_URL!,
-  token: process.env.fiducia_central_ledger_stream_REST_API_TOKEN!,
+  url: redisUrl!,
+  token: redisToken!,
 });
 
 // Database Key Namespace identifier for your immutable ledger chain stream
