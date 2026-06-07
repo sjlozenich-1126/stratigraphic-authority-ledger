@@ -1,0 +1,61 @@
+{
+  "id": "string",                     // unique entry ID (e.g. ULID/UUID)
+  "timestamp": "string",              // ISO 8601
+
+  "asset": {
+    "id": "string",                   // asset/document/instrument identifier
+    "type": "string",                 // e.g. "document", "currency_unit", "credit_line"
+    "label": "string"                 // human-readable name/description
+  },
+
+  "action": {
+    "token": "string",                // e.g. "MINT_FDC", "TRANSFER_FDC", "REDEEM_FDC", "REGISTER_DOC"
+    "stratum": "string",              // e.g. "01-Inherent", "02-Constitutional", ...
+    "reason": "string"                // human-readable justification / purpose
+  },
+
+  "parties": {
+    "issuer": "string",               // authority performing the action (e.g. "Fiducia Centrale")
+    "from": "string|null",            // sender / prior holder (if applicable)
+    "to": "string|null",              // recipient / new holder (if applicable)
+    "beneficiaries": ["string"]       // optional list of affected parties
+  },
+
+  "instrument": {
+    "type": "string|null",            // e.g. "currency", "credit", "certificate", "doc_provenance"
+    "unit": "string|null",            // e.g. "FDC"
+    "amount": "number|null",          // numeric quantity (for currency/credit)
+    "terms_ref": "string|null"        // reference to instrument/terms definition (e.g. constitution ID)
+  },
+
+  "legal": {
+    "jurisdiction": "string|null",    // e.g. "US-WA", "INTL", "ON-CHAIN"
+    "forum": "string|null",           // e.g. "Fiducia Centrale", "Arb-01"
+    "upstream_refs": ["string"],      // prior ledger IDs this entry depends on
+    "doc_hash": "string|null",        // hash of attached legal doc/template instance
+    "doc_uri": "string|null"          // optional URI to full document (IPFS, HTTPS, etc.)
+  },
+
+  "crypto": {
+    "entry_hash": "string",           // hash of this entry’s canonical form
+    "signatures": [
+      {
+        "signer": "string",           // key / node / authority ID
+        "algo": "string",             // e.g. "ed25519"
+        "signature": "string"
+      }
+    ],
+    "nonce": "string"                 // anti-replay / uniqueness
+  },
+
+  "policy": {
+    "gdr_index_delta": "number|null", // change to Global Debt Reduction Index (e.g. -1000 on mint)
+    "constraints": ["string"]         // applied policy constraints (e.g. "ISSUANCE_RULE_01")
+  },
+
+  "metadata": {
+    "tags": ["string"],               // free-form tags
+    "notes": "string|null",           // human-readable notes
+    "version": "string"               // schema version
+  }
+}
